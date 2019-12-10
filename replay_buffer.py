@@ -61,7 +61,13 @@ class ReplayBuffer(object):
             np.array(state_new_t), np.array(r_t), np.array(done_t)
 
     def make_index(self, batch_size):
-        return [random.randint(0, len(self._storage) - 1) for _ in range(batch_size)]
+        len_now = len(self._storage) - 1
+        index_list = []
+        for _ in range(batch_size):
+            rand_idx = random.randint(0, len_now-1)
+            if rand_idx != self._now_idx:
+                index_list.append(rand_idx)
+        return index_list
 
     def make_latest_index(self, batch_size):
         idx = [(self._next_idx - 1 - i) % self._maxsize for i in range(batch_size)]
@@ -90,7 +96,7 @@ class ReplayBuffer(object):
         if batch_size > 0:
             idxes = self.make_index(batch_size)
         else:
-            idxes = range(0, len(self._storage))
+            idxes = range(0, len(self._storage)-1)
         return self._encode_sample(idxes)
 
     def collect(self):

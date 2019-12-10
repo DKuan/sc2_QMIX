@@ -22,19 +22,28 @@ class Q_Network(nn.Module):
         nn.init.xavier_uniform_(self.mlp_out_layer.weight)
         #nn.init.xavier_uniform_(self.GRU_layer.all_weights)
 
-    def forward(self, obs_a_cat, hidden_last):
+    def forward(self, obs_a_cat, hidden_last, learn_flag=False):
+        # for id in range(len(obs_a_cat)):
+        #     x = self.mlp_in_layer(obs_a_cat[id])
+        #     gru_out = self.GRU_layer(x.reshape(1, -1), hidden_last[id].reshape(1, -1)) if id == 0 else \
+        #         torch.cat([gru_out, self.GRU_layer(x.reshape(1, -1), hidden_last[id].reshape(1, -1))], dim=0)
+        #     output = self.mlp_out_layer(gru_out) if id == 0 else \
+        #         torch.cat([output, torch.reshape(self.mlp_out_layer(gru_out[-1]), [1, -1])], dim=0)
+
         x = self.mlp_in_layer(obs_a_cat)
         gru_out = self.GRU_layer(x, hidden_last)
         output = self.mlp_out_layer(gru_out)
         return output, gru_out
     
 class Hyper_Network(nn.Module):
-    def __init__(self, shape_state, args):
+    def __init__(self, shape_state, shape_hyper_net, args):
         super(Hyper_Network, self).__init__()
-        self.w1_layer = nn.Linear(shape_state, args.hyper_par['w1'])
-        self.w2_layer = nn.Linear(shape_state, args.hyper_par['w2'])
-        self.b1_layer = nn.Linear(shape_state, args.hyper_par['b1'])
-        self.b2_layer = nn.Linear(shape_state, args.hyper_par['b2'])
+        self.hyper_net_pars = shape_hyper_net
+        self.w1_layer = nn.Linear(shape_state, shape_hyper_net['w1_size'])
+        self.w2_layer = nn.Linear(shape_state, shape_hyper_net['w2_size'])
+        self.b1_layer = nn.Linear(shape_state, shape_hyper_net['b1_size'])
+        self.b2_layer_i = nn.Linear(shape_state, args.shape_hyper_b2_hidden)
+        self.b2_layer_h = nn.Linear(args.shape_hyper_b2_hidden, shape_hyper_net['b2_size'])
         self.LReLU = nn.LeakyReLU(0.01)
 
         self.reset_parameters()
@@ -44,29 +53,38 @@ class Hyper_Network(nn.Module):
         nn.init.xavier_uniform_(self.w1_layer.weight)
         nn.init.xavier_uniform_(self.w2_layer.weight)
         nn.init.xavier_uniform_(self.b1_layer.weight)
-        nn.init.xavier_uniform_(self.b2_layer.weight)
+        nn.init.xavier_uniform_(self.b2_layer_i.weight)
+        nn.init.xavier_uniform_(self.b2_layer_h.weight)
 
     def forward(self, state):
-        w1 = self.w1_layer(state)
-        b1 = self.b1_layer(state)
-        w2 = self.w2_layer(state)
-        b2 = self.b2_layer(state)
-        return w1, b1, w2, b2
+        w1_shape = self.hyper_net_pars['w1_shape']
+        w2_shape = self.hyper_net_pars['w2_shape']
+        w1 = torch.abs(self.w1_layer(state)).reshape(-1, w1_shape[0], w1_shape[1])
+        w2 = torch.abs(self.w2_layer(state)).reshape(-1, w2_shape[0], w2_shape[1])
+        b1 = self.b1_layer(state).reshape(-1, 1, self.hyper_net_pars['b1_shape'][0])
+        x = self.LReLU(self.b2_layer_i(state))
+        b2 = self.b2_layer_h(x).reshape(-1, 1, self.hyper_net_pars['b2_shape'][0])
+        return {'w1':w1, 'b1':b1, 'w2':w2, 'b2':b2}
         
 class Mixing_Network(nn.Module):
     def __init__(self, action_size, num_agents, args):
         super(Mixing_Network, self).__init__()
-        self.mlp_layer1 = nn.Linear(action_size*num_agents, args.mix_net_out[0])
-        self.mlp_layer2 = nn.Linear(args.mix_net_out[0], args.mix_net_out[1])
-
-        self.reset_parameter()
-        self.train()
-
-    def reset_parameter(self):
-        nn.init.xavier_uniform_(self.mlp_layer1.weight)
-        nn.init.xavier_uniform_(self.mlp_layer2.weight)
+        # action_size * num_agents = the num of Q values
+        self.w1_shape = torch.Size((action_size*num_agents, args.mix_net_out[0]))
+        self.b1_shape = torch.Size((args.mix_net_out[0], ))
+        self.w2_shape = torch.Size((args.mix_net_out[0], args.mix_net_out[1]))
+        self.b2_shape = torch.Size((args.mix_net_out[1], ))
+        self.w1_size = self.w1_shape[0] * self.w1_shape[1]
+        self.b1_size = self.b1_shape[0]
+        self.w2_size = self.w2_shape[0] * self.w2_shape[1]
+        self.b2_size = self.b2_shape[0]
+        self.pars = {'w1_shape':self.w1_shape, 'w1_size':self.w1_size, \
+                'w2_shape':self.w2_shape, 'w2_size':self.w2_size, \
+                'b1_shape':self.b1_shape, 'b1_size':self.b1_size, \
+                'b2_shape':self.b2_shape, 'b2_size':self.b2_size, }
+        self.LReLU = nn.LeakyReLU(0.001)
     
-    def forward(self, input):
-        x = self.mlp_layer1(input)
-        output = self.mlp_layer2(x)
-        return output
+    def forward(self, q_values, hyper_pars):
+        x = self.LReLU(torch.bmm(q_values, hyper_pars['w1']) + hyper_pars['b1'])
+        output = torch.bmm(x, hyper_pars['w2']) + hyper_pars['b2']
+        return output.reshape(-1)
