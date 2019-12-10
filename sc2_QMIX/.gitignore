@@ -1,8 +1,0 @@
-.gitee/
-.vscode/
-.idea/
-.__pycache__/
-*.pyc
-*.pt
-*.gif
-*.txt
