@@ -24,13 +24,24 @@ class ReplayBuffer(object):
         self._next_idx = 0
         self._now_idx = None
 
-    def add(self, obs, u_last, hidden_last, state, \
-                u, hidden, obs_new, state_new, r, done):
-        data = (obs, u_last, hidden_last, state, \
-                u, hidden, obs_new, state_new, r, done)
-        self._storage[self._now_idx].append(data)
+    def add(self, data):
+        #data = bs_and_u_last, state, \
+                #u, new_avail_actions, obs_new, state_new, r, done
+        if self._storage[self._now_idx].__len__() == 0:
+            self._storage[self._now_idx] = [data_item for data_item in data]
+        else:
+            for item_idx, item in enumerate(data):
+                # print('the item shape is', item.shape)
+                # print('the item storage is ', self._storage[self._now_idx][item_idx].shape)
+                self._storage[self._now_idx][item_idx] = np.vstack((self._storage[self._now_idx][item_idx], item))
 
     def create_new_episode(self):
+        """ add a check step, in case the game is end without done """
+        if self._storage.__len__() > 0 and self._storage[self._now_idx][-1][-1] != True:
+            print('clear and restore')
+            self._storage[self._now_idx].clear()
+            return # end without add new memor
+
         if self._next_idx >= len(self._storage):
             self._storage.append([])
         else:
@@ -39,26 +50,21 @@ class ReplayBuffer(object):
         self._next_idx = (self._next_idx + 1) % self._maxsize
 
     def _encode_sample(self, idxes):
-        obs_t, u_last_t, hidden_last_t, state_t, u_t, hidden_t, \
-            obs_new_t, state_new_t, r_t, done_t = [], [], [], [], [], [], [], [], [], []
-        for i in idxes:
-            data_episode = self._storage[i]
-            for data in data_episode:
-                obs, u_last, hidden_last, state, u, hidden, \
-                    obs_new, state_new, r, done = data # episode_data
-                obs_t.append(obs)
-                u_last_t.append(u_last)
-                hidden_last_t.append(hidden_last)
-                state_t.append(state)
-                u_t.append(u)
-                hidden_t.append(hidden)
-                obs_new_t.append(obs_new)
-                state_new_t.append(state_new)
-                r_t.append(r)
-                done_t.append(done)
-        return np.array(obs_t), np.array(u_last_t), np.array(hidden_last_t), np.array(state_t), \
-            np.array(u_t), np.array(hidden_t), np.array(obs_new_t), \
-            np.array(state_new_t), np.array(r_t), np.array(done_t)
+        # obs_t, state_t, u_t, new_avail_actions_t, \
+        #     obs_new_t, state_new_t, r_t, done_t = [], [], [], [], [], [], [], [] 
+        #     obs_and_last_action_t, state_t, u_t, new_avail_actions_t, \
+        # obs_new_t, state_new_t, r_t, done_t = data_episode[:]
+        data_encode_all = None
+        for idx_id, idx in enumerate(idxes):
+            data_episode = self._storage[idx]
+            #print('sample {} data_spisode len is'.format(idx), data_episode[0].shape)
+            if idx_id == 0: 
+                data_encode_all = [item for item in data_episode] 
+            else: 
+                for item_idx, item in enumerate(data_episode):
+                    data_encode_all[item_idx] = np.vstack((data_encode_all[item_idx], item))
+
+        return data_encode_all[:]
 
     def make_index(self, batch_size):
         len_now = len(self._storage) - 1

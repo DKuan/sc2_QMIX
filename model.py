@@ -70,7 +70,7 @@ class Mixing_Network(nn.Module):
     def __init__(self, action_size, num_agents, args):
         super(Mixing_Network, self).__init__()
         # action_size * num_agents = the num of Q values
-        self.w1_shape = torch.Size((action_size*num_agents, args.mix_net_out[0]))
+        self.w1_shape = torch.Size((num_agents, args.mix_net_out[0]))
         self.b1_shape = torch.Size((args.mix_net_out[0], ))
         self.w2_shape = torch.Size((args.mix_net_out[0], args.mix_net_out[1]))
         self.b2_shape = torch.Size((args.mix_net_out[1], ))
@@ -85,6 +85,8 @@ class Mixing_Network(nn.Module):
         self.LReLU = nn.LeakyReLU(0.001)
     
     def forward(self, q_values, hyper_pars):
+        #print('q_values shape is', q_values.shape)
+        #print(' hyper pars shape is', hyper_pars['w1'].shape, hyper_pars['b1'].shape)
         x = self.LReLU(torch.bmm(q_values, hyper_pars['w1']) + hyper_pars['b1'])
         output = torch.bmm(x, hyper_pars['w2']) + hyper_pars['b2']
         return output.reshape(-1)
