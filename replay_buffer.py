@@ -38,7 +38,7 @@ class ReplayBuffer(object):
     def create_new_episode(self):
         """ add a check step, in case the game is end without done """
         if self._storage.__len__() > 0 and self._storage[self._now_idx][-1][-1] != True:
-            print('clear and restore')
+            #print('clear and restore')
             self._storage[self._now_idx].clear()
             return # end without add new memor
 
@@ -55,9 +55,11 @@ class ReplayBuffer(object):
         #     obs_and_last_action_t, state_t, u_t, new_avail_actions_t, \
         # obs_new_t, state_new_t, r_t, done_t = data_episode[:]
         data_encode_all = None
+        # print('self.now_idx is', self._now_idx)
+        # print('the choosed idxes is {}, all len is {}'.format(idxes, idxes.__len__()))
         for idx_id, idx in enumerate(idxes):
             data_episode = self._storage[idx]
-            #print('sample {} data_spisode len is'.format(idx), data_episode[0].shape)
+            # print('idx:{} data_spisode'.format(idx), data_episode[-1][-1])
             if idx_id == 0: 
                 data_encode_all = [item for item in data_episode] 
             else: 
@@ -71,8 +73,9 @@ class ReplayBuffer(object):
         index_list = []
         for _ in range(batch_size):
             rand_idx = random.randint(0, len_now-1)
-            if rand_idx != self._now_idx:
-                index_list.append(rand_idx)
+            while rand_idx == self._now_idx:
+                rand_idx = random.randint(0, len_now-1) 
+            index_list.append(rand_idx)
         return index_list
 
     def make_latest_index(self, batch_size):

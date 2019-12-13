@@ -40,6 +40,11 @@ class QMIX_Agent():
                                                 {'params':self.hyper_net_cur.parameters()},
             ], lr=args.lr)
     
+    def enjoy_trainers(self, args):
+        self.mixing_net = Mixing_Network(max(self.num_actions_set), self.num_agents, args).to(args.device)
+        self.q_net_cur = torch.load(args.old_model_name+'q_net.pkl', map_location=args.device)
+        self.hyper_net_cur = torch.load(args.old_model_name+'hyper_net.pkl', map_location=args.device)
+
     def save_memory(self, obs_and_u_last, state, \
                 u, new_avail_actions, obs_new, state_new, r, done):
         r = np.array([r])[np.newaxis, :]
@@ -116,7 +121,7 @@ class QMIX_Agent():
         hyper_pars_cur = self.hyper_net_cur(state_t_b)
         hyper_pars_tar = self.hyper_net_tar(state_new_t_b)
         qtot_tar = self.mixing_net(q_tar, hyper_pars_tar) # the net is no par
-        q_ = r_t_b * args.gamma * done_t_b + qtot_tar
+        q_ = r_t_b + qtot_tar * args.gamma * done_t_b
         qtot_cur = self.mixing_net(q_cur, hyper_pars_cur)
 
         return qtot_cur, qtot_tar
@@ -125,7 +130,7 @@ class QMIX_Agent():
         if epi_cnt < args.learning_start_episode: return
         if self.epsilon > 0.08 : self.epsilon *= args.anneal_par
         if step_cnt % args.learning_fre != 0: return
-        print('learn cnt ', self.learned_cnt)
+        #print('learn cnt ', self.learned_cnt)
         self.learned_cnt += 1
 
         """ step1: get the batch data from the memory and change to tensor"""

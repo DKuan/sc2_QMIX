@@ -72,9 +72,9 @@ def train(env, args):
             episode_reward += reward
             if done: break
 
-        #if epi_cnt % 10 == 0:
-        print("episode_cnt:{} episode_len:{} epsilon: {} reward in episode {}".format( \
-            epi_cnt, epi_step_cnt, round(qmix_agent.epsilon, 3), round(episode_reward, 3)))
+        if epi_cnt % 10 == 0:
+            print("episode_cnt:{} episode_len:{} epsilon: {} reward in episode {}".format( \
+                epi_cnt, epi_step_cnt, round(qmix_agent.epsilon, 3), round(episode_reward, 3)))
 
     """ close the env """
     #env.save_replay()
