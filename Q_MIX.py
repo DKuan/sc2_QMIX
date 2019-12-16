@@ -23,6 +23,7 @@ class QMIX_Agent():
         self.num_agents = num_agents
         self.num_actions_set = num_actions_set
         self.last_cnt4update = 0
+        self.last_epi_cnt = 0
         self.mse_loss = F.mse_loss
         self.memory = ReplayBuffer(args.memory_size)
         self.learned_cnt = 0
@@ -36,9 +37,11 @@ class QMIX_Agent():
         self.hyper_net_cur = Hyper_Network(self.shape_state, self.mixing_net.pars, args).to(args.device)
         self.hyper_net_tar.load_state_dict(self.hyper_net_cur.state_dict()) # update the tar net par
         self.q_net_tar.load_state_dict(self.q_net_cur.state_dict()) # update the tar net par
-        self.optimizer = torch.optim.RMSprop([{'params':self.q_net_cur.parameters()}, 
-                                                {'params':self.hyper_net_cur.parameters()},
-            ], lr=args.lr)
+        # self.optimizer = torch.optim.RMSprop([{'params':self.q_net_cur.parameters()}, 
+        #                                         {'params':self.hyper_net_cur.parameters()},
+        #     ], lr=args.lr)
+        self.params_cur = list(self.q_net_cur.parameters()) + list(self.hyper_net_cur.parameters())
+        self.optimizer = torch.optim.RMSprop(self.params_cur, lr=args.lr)
     
     def enjoy_trainers(self, args):
         self.mixing_net = Mixing_Network(max(self.num_actions_set), self.num_agents, args).to(args.device)
@@ -63,7 +66,7 @@ class QMIX_Agent():
             torch.from_numpy(hidden_last).to(args.device, dtype=torch.float))
         
         """ step2: mask the q_values"""
-        mask = torch.from_numpy(avail_actions) # mask the actions
+        mask = torch.from_numpy(avail_actions).to(args.device) # mask the actions
         q_values[mask==0] = float('-inf')
         
         """ choose action by e-greedy """
@@ -82,7 +85,7 @@ class QMIX_Agent():
         """step1: split the batch data and change the numpy data to tensor data """
         obs_and_u_last_n, state_n, u_n, new_avail_act_n, \
             obs_new_n, state_new_n, r_n, done_n =  batch_data # obs_n obs_numpy
-        data_test = np.where(done_n==True)
+        #data_test = np.where(done_n==True)
         obs_and_u_last_t_b = torch.from_numpy(obs_and_u_last_n).to(args.device, dtype=torch.float) # obs_tensor_batch 
         state_t_b = torch.from_numpy(state_n).to(args.device, dtype=torch.float) 
         u_t_b = torch.from_numpy(u_n).to(args.device, dtype=torch.float)
@@ -121,24 +124,28 @@ class QMIX_Agent():
         hyper_pars_cur = self.hyper_net_cur(state_t_b)
         hyper_pars_tar = self.hyper_net_tar(state_new_t_b)
         qtot_tar = self.mixing_net(q_tar, hyper_pars_tar) # the net is no par
-        q_ = r_t_b + qtot_tar * args.gamma * done_t_b
+        qtot_tar = r_t_b + qtot_tar * args.gamma * done_t_b
         qtot_cur = self.mixing_net(q_cur, hyper_pars_cur)
 
         return qtot_cur, qtot_tar
         
     def learn(self, step_cnt, epi_cnt, args):
+        loss = 0.0 
         if epi_cnt < args.learning_start_episode: return
-        if self.epsilon > 0.08 : self.epsilon *= args.anneal_par
-        if step_cnt % args.learning_fre != 0: return
+        #if step_cnt % args.learning_fre != 0: return
+        if epi_cnt <= self.last_epi_cnt: return
+        self.last_epi_cnt = epi_cnt
+        if self.epsilon > 0.08 : self.epsilon -= args.anneal_par
+        if epi_cnt % args.learning_fre != 0: return
         #print('learn cnt ', self.learned_cnt)
         self.learned_cnt += 1
 
         """ step1: get the batch data from the memory and change to tensor"""
         batch_data =  self.memory.sample(args.batch_size) # obs_n obs_numpy
-        q_, q = self.cal_totq_values(batch_data, args)
+        q, q_ = self.cal_totq_values(batch_data, args)
 
         """ step5: cal the loss by bellman equation """
-        loss = self.mse_loss(q_, q)
+        loss = self.mse_loss(q_.detach(), q)
 
         """ step5: loss backward """
         self.optimizer.zero_grad()

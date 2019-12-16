@@ -2,6 +2,7 @@
 # Author: Zachry
 # Time: 2019-12-13
 # Description: File for checking the model trained already. 
+import os
 import sys
 
 import torch 
@@ -15,10 +16,11 @@ def enjoy(env, args):
     """ step1: init the env and par """
     env_info = env.get_env_info()
     num_agents = env_info["n_agents"]
-    shape_obs = env_info['obs_shape'] + 1 # first bit is agent_idx
+    shape_obs = env_info['obs_shape'] + num_agents # first bit is agent_idx
     shape_state = env_info['state_shape']
     num_actions_set = [env_info["n_actions"]]
-    obs_0_idx = np.arange(0, num_agents).reshape(num_agents, 1)
+    #obs_0_idx = np.arange(0, num_agents).reshape(num_agents, 1)
+    obs_0_idx = np.eye(num_agents)
     rewards_list = []
 
     """ step: init the QMIX agent """
@@ -59,7 +61,8 @@ def enjoy(env, args):
 
 if __name__ == '__main__':
     args = parse_args()
-    env = StarCraft2Env(map_name=args.map_name, replay_dir='./replays', replay_prefix='3s5zVS3s6z')
+
+    env = StarCraft2Env(map_name=args.map_name, replay_dir=os.path.join(os.getcwd(), 'replays'), replay_prefix=args.map_name)
 
     """ run the main """
     enjoy(env, args)

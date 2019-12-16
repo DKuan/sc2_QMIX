@@ -15,10 +15,10 @@ def train(env, args):
     """ step: init the env and par """
     env_info = env.get_env_info()
     num_agents = env_info["n_agents"]
-    shape_obs = env_info['obs_shape'] + 1 # first bit is agent_idx
+    shape_obs = env_info['obs_shape'] + num_agents # add agent_idx bits
     shape_state = env_info['state_shape']
     num_actions_set = [env_info["n_actions"]]
-    obs_0_idx = np.arange(0, num_agents).reshape(num_agents, 1)
+    obs_0_idx = np.eye(num_agents)
 
     """ step: init the QMIX agent """
     qmix_agent = QMIX_Agent(shape_obs, shape_state, num_agents, num_actions_set, args)
@@ -66,28 +66,29 @@ def train(env, args):
             hidden_last = hidden
 
             # agents learn
-            qmix_agent.learn(step_cnt, epi_cnt, args)
+            loss = qmix_agent.learn(step_cnt, epi_cnt, args)
+            print(' '*80, 'loss is', loss, end='\r')
 
             # if done, end the episode
             episode_reward += reward
             if done: break
 
-        if epi_cnt % 10 == 0:
-            print("episode_cnt:{} episode_len:{} epsilon: {} reward in episode {}".format( \
-                epi_cnt, epi_step_cnt, round(qmix_agent.epsilon, 3), round(episode_reward, 3)))
+        if epi_cnt % 4 == 0:
+            print("episode_cnt:{} episode_len:{} epsilon: {} reward in episode {} ".format( \
+                epi_cnt, epi_step_cnt, round(qmix_agent.epsilon, 3), round(episode_reward, 3), \
+                ))
 
     """ close the env """
-    #env.save_replay()
     env.close()
 
 def evaluation(env, args, qmix_agent):
     """ step1: init the env and par """
     env_info = env.get_env_info()
     num_agents = env_info["n_agents"]
-    shape_obs = env_info['obs_shape'] + 1 # first bit is agent_idx
+    shape_obs = env_info['obs_shape'] + num_agents # first bit is agent_idx
     shape_state = env_info['state_shape']
     num_actions_set = [env_info["n_actions"]]
-    obs_0_idx = np.arange(0, num_agents).reshape(num_agents, 1)
+    obs_0_idx = np.eye(num_agents)
     rewards_list = []
 
     for _ in range(args.num_epi4evaluation):
@@ -120,7 +121,7 @@ def evaluation(env, args, qmix_agent):
 
 if __name__ == '__main__':
     args = parse_args()
-    env = StarCraft2Env(map_name=args.map_name, replay_dir='./replays', replay_prefix='3s5zVS3s6z')
+    env = StarCraft2Env(map_name=args.map_name, difficulty=args.difficulty)
 
     """ run the main """
     train(env, args)
