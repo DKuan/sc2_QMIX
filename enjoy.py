@@ -27,7 +27,7 @@ def enjoy(env, args):
     qmix_agent = QMIX_Agent(shape_obs, shape_state, num_agents, num_actions_set, args)
     qmix_agent.enjoy_trainers(args)
 
-    for _ in range(args.num_epi4evaluation):
+    for _ in range(args.num_epi4enjoy):
         env.reset()
         episode_reward = 0
         actions_last = env.last_action 

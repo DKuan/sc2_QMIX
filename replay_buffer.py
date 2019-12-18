@@ -28,17 +28,14 @@ class ReplayBuffer(object):
         #data = bs_and_u_last, state, \
                 #u, new_avail_actions, obs_new, state_new, r, done
         if self._storage[self._now_idx].__len__() == 0:
-            self._storage[self._now_idx] = [data_item for data_item in data]
+            self._storage[self._now_idx] = [np.array(data_item) for data_item in data]
         else:
             for item_idx, item in enumerate(data):
-                # print('the item shape is', item.shape)
-                # print('the item storage is ', self._storage[self._now_idx][item_idx].shape)
                 self._storage[self._now_idx][item_idx] = np.vstack((self._storage[self._now_idx][item_idx], item))
 
     def create_new_episode(self):
         """ add a check step, in case the game is end without done """
         if self._storage.__len__() > 0 and self._storage[self._now_idx][-1][-1] != True:
-            #print('clear and restore')
             self._storage[self._now_idx].clear()
             return # end without add new memor
 
@@ -50,23 +47,33 @@ class ReplayBuffer(object):
         self._next_idx = (self._next_idx + 1) % self._maxsize
 
     def _encode_sample(self, idxes):
-        # obs_t, state_t, u_t, new_avail_actions_t, \
-        #     obs_new_t, state_new_t, r_t, done_t = [], [], [], [], [], [], [], [] 
         #     obs_and_last_action_t, state_t, u_t, new_avail_actions_t, \
         # obs_new_t, state_new_t, r_t, done_t = data_episode[:]
         data_encode_all = None
-        # print('self.now_idx is', self._now_idx)
-        # print('the choosed idxes is {}, all len is {}'.format(idxes, idxes.__len__()))
+
+        # get the max episode len
+        max_episode_len = 0
+        for idx_id, idx in enumerate(idxes): #
+            data_episode = self._storage[idx]
+            max_episode_len = max_episode_len if data_episode[0].shape[0] < max_episode_len \
+                else data_episode[0].shape[0]
+
+        # get the batch data and fill zeros to small shape data
+        num_diff_lens = []
         for idx_id, idx in enumerate(idxes):
             data_episode = self._storage[idx]
-            # print('idx:{} data_spisode'.format(idx), data_episode[-1][-1])
+            num_diff_len = max_episode_len - data_episode[0].shape[0]
+            num_diff_lens.append(num_diff_len)
+            data_episode = [np.vstack([data, np.zeros((num_diff_len,)+data[0].shape)])[np.newaxis, :] \
+                for data in data_episode]
+
             if idx_id == 0: 
-                data_encode_all = [item for item in data_episode] 
+                data_encode_all = [data for data in data_episode] 
             else: 
                 for item_idx, item in enumerate(data_episode):
-                    data_encode_all[item_idx] = np.vstack((data_encode_all[item_idx], item))
+                    data_encode_all[item_idx] = np.vstack([data_encode_all[item_idx], item])
 
-        return data_encode_all[:]
+        return data_encode_all[:], num_diff_lens
 
     def make_index(self, batch_size):
         len_now = len(self._storage) - 1

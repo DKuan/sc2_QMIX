@@ -2,6 +2,8 @@
 # Author: Zachry
 # Time: 2019-12-04
 # Description: The model structure of QMIX
+import time
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,28 +11,24 @@ import torch.nn.functional as F
 class Q_Network(nn.Module):
     def __init__(self, obs_size, act_size, args):
         super(Q_Network, self).__init__()
+        self.hidden_size = args.q_net_hidden_size
         self.mlp_in_layer = nn.Linear(obs_size+act_size, args.q_net_out[0])
         self.mlp_out_layer = nn.Linear(args.q_net_hidden_size, act_size)
         self.GRU_layer = nn.GRUCell(args.q_net_out[0], args.q_net_hidden_size)
-        #self.GRU_layer = nn.GRU(args.q_net_out[0], args.q_net_hidden_size, args.q_net_out[1])
+        self.ReLU = nn.ReLU()
 
-        #self.reset_parameters()
         self.train()
 
     def reset_parameters(self):
         nn.init.xavier_uniform_(self.mlp_in_layer.weight)
         nn.init.xavier_uniform_(self.mlp_out_layer.weight)
-        #nn.init.xavier_uniform_(self.GRU_layer.all_weights)
+    
+    def init_hidden(self, args):
+        return self.mlp_in_layer.weight.new(1, args.q_net_hidden_size).zero_()
 
-    def forward(self, obs_a_cat, hidden_last, learn_flag=False):
-        # for id in range(len(obs_a_cat)):
-        #     x = self.mlp_in_layer(obs_a_cat[id])
-        #     gru_out = self.GRU_layer(x.reshape(1, -1), hidden_last[id].reshape(1, -1)) if id == 0 else \
-        #         torch.cat([gru_out, self.GRU_layer(x.reshape(1, -1), hidden_last[id].reshape(1, -1))], dim=0)
-        #     output = self.mlp_out_layer(gru_out) if id == 0 else \
-        #         torch.cat([output, torch.reshape(self.mlp_out_layer(gru_out[-1]), [1, -1])], dim=0)
-
-        x = self.mlp_in_layer(obs_a_cat)
+    def forward(self, obs_a_cat, hidden_last):
+        #x = self.ReLU(self.mlp_in_layer(obs_a_cat))
+        x = self.ReLU(self.mlp_in_layer(obs_a_cat))
         gru_out = self.GRU_layer(x, hidden_last)
         output = self.mlp_out_layer(gru_out)
         return output, gru_out
@@ -60,12 +58,12 @@ class Hyper_Network(nn.Module):
     def forward(self, state):
         w1_shape = self.hyper_net_pars['w1_shape']
         w2_shape = self.hyper_net_pars['w2_shape']
-        w1 = torch.abs(self.w1_layer(state)).reshape(-1, w1_shape[0], w1_shape[1])
-        w2 = torch.abs(self.w2_layer(state)).reshape(-1, w2_shape[0], w2_shape[1])
-        b1 = self.b1_layer(state).reshape(-1, 1, self.hyper_net_pars['b1_shape'][0])
+        w1 = torch.abs(self.w1_layer(state)).view(-1, w1_shape[0], w1_shape[1])
+        w2 = torch.abs(self.w2_layer(state)).view(-1, w2_shape[0], w2_shape[1])
+        b1 = self.b1_layer(state).view(-1, 1, self.hyper_net_pars['b1_shape'][0])
         #x = self.LReLU(self.b2_layer_i(state))
         x = self.ReLU(self.b2_layer_i(state))
-        b2 = self.b2_layer_h(x).reshape(-1, 1, self.hyper_net_pars['b2_shape'][0])
+        b2 = self.b2_layer_h(x).view(-1, 1, self.hyper_net_pars['b2_shape'][0])
         return {'w1':w1, 'b1':b1, 'w2':w2, 'b2':b2}
         
 class Mixing_Network(nn.Module):
@@ -90,4 +88,4 @@ class Mixing_Network(nn.Module):
     def forward(self, q_values, hyper_pars):
         x = self.ReLU(torch.bmm(q_values, hyper_pars['w1']) + hyper_pars['b1'])
         output = torch.bmm(x, hyper_pars['w2']) + hyper_pars['b2']
-        return output.reshape(-1)
+        return output.view(-1)

@@ -1,6 +1,6 @@
 # QMIX for StarCraft II
 ## No. of Edition: 12-16-14-26 
-The edition of the project uploaded is 12-16-14-26, which will be updated in a few days. This edition have the same effect as the paper saies.
+The edition of the project uploaded is 12-18-14-22, which has been updated to speed the process of training. This edition have the same effect as the paper saies.
 
 ## Description:
 This project is created for using QMIX algorithm in StarCraft II mini-games. The units in these maps are partial-obs, which will show the advantage of the QMIX.   
