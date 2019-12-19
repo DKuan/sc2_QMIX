@@ -10,7 +10,8 @@ known dependencies: Python(3.6.8), StarCraft(3.16.1 or latest version), Pysc2(3.
 Step 1: Install the StarCraft and Pysc2 from the website:OpenAI Gym(0.10.5://github.com/deepmind/pysc2)   
 Step 2: Install the environment of smac(a modified env for StarCraft II based on Pysc2) from https://github.com/oxwhirl/smac   
 Step 3: Change the Hyper-parameters of the algorithm in 'arguments.py'   
-Step 4: Run the main.py file with 'python main.py'   
+Step 4: Run the main.py file with 'python main.py --map_name=8m --per_episode_max_len=80'   
+Step 5: Enjoy the model trained by yourself, you can run the command "python enjoy.py --map_name=1c3s5z --old_model_name=./models/1912_190153/"    
   
 ## Code Structure(update in the future):
 ./main.py main function of the project    
